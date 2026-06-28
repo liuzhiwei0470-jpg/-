@@ -1,4 +1,23 @@
 {
-  "buildCommand": "cd views/frontend && npm install && npm run build",
-  "outputDirectory": "views/frontend/dist"
+  "version": 2,
+  "builds": [
+    {
+      "src": "views/frontend/dist/**",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "api/*.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/views/frontend/dist/$1"
+    }
+  ]
 }
