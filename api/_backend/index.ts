@@ -1,7 +1,7 @@
-import app from './app.js';
-import { config } from './config/index.js';
-import { initDatabase } from './models/database.js';
-import { startCronJobs } from './services/index.js';
+import app from './app';
+import { config } from './config/index';
+import { initDatabase } from './models/database';
+import { startCronJobs } from './services/index';
 
 async function startServer() {
   await initDatabase();

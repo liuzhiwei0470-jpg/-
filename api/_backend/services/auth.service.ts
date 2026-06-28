@@ -1,8 +1,8 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { getRow, runSql } from '../models/database.js';
-import { config } from '../config/index.js';
-import type { User, UserCreateInput, UserResponse } from '../models/user.js';
+import { getRow, runSql } from '../models/database';
+import { config } from '../config/index';
+import type { User, UserCreateInput, UserResponse } from '../models/user';
 
 export class AuthService {
   async register(input: UserCreateInput): Promise<{ token: string; user: UserResponse }> {

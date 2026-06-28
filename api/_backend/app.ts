@@ -1,8 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import { authRoutes, subscriptionRoutes, categoryRoutes, healthRoutes, articleRoutes, settingsRoutes, shareRoutes } from './routes/index.js';
-import { errorHandler, notFoundHandler } from './middleware/index.js';
+import { authRoutes, subscriptionRoutes, categoryRoutes, healthRoutes, articleRoutes, settingsRoutes, shareRoutes } from './routes/index';
+import { errorHandler, notFoundHandler } from './middleware/index';
 
 const app = express();
 

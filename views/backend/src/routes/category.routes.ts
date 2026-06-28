@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { categoryService } from '../services/index.js';
-import { authMiddleware, validateBody } from '../middleware/index.js';
+import { categoryService } from '../services/index';
+import { authMiddleware, validateBody } from '../middleware/index';
 
 const router = Router();
 

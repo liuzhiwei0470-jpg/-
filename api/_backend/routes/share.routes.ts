@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { rssService } from '../services/index.js';
+import { rssService } from '../services/index';
 
 const router = Router();
 

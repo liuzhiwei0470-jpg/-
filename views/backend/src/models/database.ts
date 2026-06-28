@@ -1,5 +1,5 @@
 import { createClient, Client } from '@libsql/client';
-import { config } from '../config/index.js';
+import { config } from '../config/index';
 
 let db: Client;
 

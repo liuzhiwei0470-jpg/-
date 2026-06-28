@@ -1,7 +1,7 @@
 import Parser from 'rss-parser';
-import { getRow, getAllRows, runSql } from '../models/database.js';
-import type { Article, ArticleResponse } from '../models/article.js';
-import { config } from '../config/index.js';
+import { getRow, getAllRows, runSql } from '../models/database';
+import type { Article, ArticleResponse } from '../models/article';
+import { config } from '../config/index';
 
 const parser = new Parser({
   timeout: 15000,

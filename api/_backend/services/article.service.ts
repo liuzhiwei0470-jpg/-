@@ -1,6 +1,6 @@
-import { RssService } from './rss.service.js';
-import { getRow, runSql } from '../models/database.js';
-import type { Article } from '../models/article.js';
+import { RssService } from './rss.service';
+import { getRow, runSql } from '../models/database';
+import type { Article } from '../models/article';
 
 const rssService = new RssService();
 

@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { getRow, runSql } from '../models/database.js';
-import { authMiddleware } from '../middleware/index.js';
+import { getRow, runSql } from '../models/database';
+import { authMiddleware } from '../middleware/index';
 
 const router = Router();
 

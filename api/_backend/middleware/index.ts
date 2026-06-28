@@ -1,3 +1,3 @@
-export { authMiddleware, optionalAuthMiddleware } from './auth.middleware.js';
-export { validateBody, validateQuery } from './validate.middleware.js';
-export { errorHandler, notFoundHandler } from './error.middleware.js';
+export { authMiddleware, optionalAuthMiddleware } from './auth.middleware';
+export { validateBody, validateQuery } from './validate.middleware';
+export { errorHandler, notFoundHandler } from './error.middleware';

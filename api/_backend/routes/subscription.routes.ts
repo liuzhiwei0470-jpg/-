@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { subscriptionService, rssService } from '../services/index.js';
-import { authMiddleware, validateBody, validateQuery } from '../middleware/index.js';
+import { subscriptionService, rssService } from '../services/index';
+import { authMiddleware, validateBody, validateQuery } from '../middleware/index';
 
 const ROUTE_TAGS: Record<string, string[]> = {};
 

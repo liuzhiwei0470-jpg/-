@@ -1,5 +1,5 @@
-import { getRow, getAllRows, runSql } from '../models/database.js';
-import type { Category, CategoryCreateInput, CategoryResponse } from '../models/category.js';
+import { getRow, getAllRows, runSql } from '../models/database';
+import type { Category, CategoryCreateInput, CategoryResponse } from '../models/category';
 
 export class CategoryService {
   async create(input: CategoryCreateInput): Promise<CategoryResponse> {

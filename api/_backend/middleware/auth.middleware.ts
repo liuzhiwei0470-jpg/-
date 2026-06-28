@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { authService } from '../services/auth.service.js';
+import { authService } from '../services/auth.service';
 
 // 扩展Request类型
 declare global {

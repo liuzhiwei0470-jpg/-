@@ -1,5 +1,5 @@
-import { getRow, getAllRows, runSql } from '../models/database.js';
-import type { Subscription, SubscriptionCreateInput, SubscriptionUpdateInput, SubscriptionResponse } from '../models/subscription.js';
+import { getRow, getAllRows, runSql } from '../models/database';
+import type { Subscription, SubscriptionCreateInput, SubscriptionUpdateInput, SubscriptionResponse } from '../models/subscription';
 
 const DEFAULT_REFRESH_INTERVAL = 120;
 
