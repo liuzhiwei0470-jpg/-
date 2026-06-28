@@ -1,4 +1,4 @@
-import { getRow, getAllRows, runSql } from '../models/database';
+import { getRow, getAllRows, runSql } from '../models/database.js';
 export class CategoryService {
     async create(input) {
         const { userId, name } = input;

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { authService } from '../services/index';
-import { validateBody, authMiddleware } from '../middleware/index';
+import { authService } from '../services/index.js';
+import { validateBody, authMiddleware } from '../middleware/index.js';
 const router = Router();
 // 注册验证
 const registerSchema = z.object({

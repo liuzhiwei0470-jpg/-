@@ -1,4 +1,4 @@
-import { getRow, getAllRows, runSql } from '../models/database';
+import { getRow, getAllRows, runSql } from '../models/database.js';
 const DEFAULT_REFRESH_INTERVAL = 120;
 export class SubscriptionService {
     async create(input) {

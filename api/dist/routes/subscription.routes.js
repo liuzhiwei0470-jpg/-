@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { subscriptionService, rssService } from '../services/index';
-import { authMiddleware, validateBody, validateQuery } from '../middleware/index';
+import { subscriptionService, rssService } from '../services/index.js';
+import { authMiddleware, validateBody, validateQuery } from '../middleware/index.js';
 const ROUTE_TAGS = {};
 const router = Router();
 // 所有订阅路由都需要登录

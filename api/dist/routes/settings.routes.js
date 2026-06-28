@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { getRow, runSql } from '../models/database';
-import { authMiddleware } from '../middleware/index';
+import { getRow, runSql } from '../models/database.js';
+import { authMiddleware } from '../middleware/index.js';
 const router = Router();
 router.use(authMiddleware);
 // 获取用户设置

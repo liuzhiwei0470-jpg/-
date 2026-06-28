@@ -1,4 +1,4 @@
-import { authService } from '../services/auth.service';
+import { authService } from '../services/auth.service.js';
 // JWT认证中间件
 export function authMiddleware(req, res, next) {
     const authHeader = req.headers.authorization;

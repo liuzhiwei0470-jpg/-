@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { categoryService } from '../services/index';
-import { authMiddleware, validateBody } from '../middleware/index';
+import { categoryService } from '../services/index.js';
+import { authMiddleware, validateBody } from '../middleware/index.js';
 const router = Router();
 // 所有分类路由都需要登录
 router.use(authMiddleware);

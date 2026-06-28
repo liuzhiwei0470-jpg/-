@@ -1,5 +1,5 @@
-import { RssService } from './rss.service';
-import { getRow, runSql } from '../models/database';
+import { RssService } from './rss.service.js';
+import { getRow, runSql } from '../models/database.js';
 const rssService = new RssService();
 async function getArticleContent(articleId) {
     const article = await getRow('SELECT * FROM articles WHERE id = ?', articleId);

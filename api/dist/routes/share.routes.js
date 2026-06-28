@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { rssService } from '../services/index';
+import { rssService } from '../services/index.js';
 const router = Router();
 // 公开API：获取分享文章内容（无需登录）
 router.get('/share/:token', async (req, res, next) => {

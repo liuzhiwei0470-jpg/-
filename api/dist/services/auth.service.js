@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { getRow, runSql } from '../models/database';
-import { config } from '../config/index';
+import { getRow, runSql } from '../models/database.js';
+import { config } from '../config/index.js';
 export class AuthService {
     async register(input) {
         const { email, password } = input;

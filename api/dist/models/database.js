@@ -1,5 +1,5 @@
 import { createClient } from '@libsql/client';
-import { config } from '../config/index';
+import { config } from '../config/index.js';
 let db;
 export function getDb() {
     if (!db) {

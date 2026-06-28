@@ -1,6 +1,6 @@
 import cron from 'node-cron';
-import { getAllRows } from '../models/database';
-import { rssService } from './rss.service';
+import { getAllRows } from '../models/database.js';
+import { rssService } from './rss.service.js';
 const lastSyncMap = new Map();
 export function startCronJobs() {
     refreshAllSubscriptions();
