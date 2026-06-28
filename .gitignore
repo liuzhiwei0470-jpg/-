@@ -10,3 +10,7 @@ rsshub/
 npm-debug.log*
 .vscode/
 .idea/
+
+# 取消对 api/dist 的忽略，让 Vercel 可以使用预编译的代码
+!api/dist/
+!api/dist/**
