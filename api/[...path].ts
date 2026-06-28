@@ -1,10 +1,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import express from 'express';
-import { healthRoutes } from './_backend/routes';
+import healthRouter from './health';
 
 const app = express();
 
-app.use('/api', healthRoutes);
+app.use('/api', healthRouter);
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
