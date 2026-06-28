@@ -1,15 +1,5 @@
 {
   "buildCommand": "cd views/frontend && npm run build",
   "outputDirectory": "views/frontend/dist",
-  "installCommand": "npm install && cd views/frontend && npm install",
-  "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "/api/:path*"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
-  ]
+  "installCommand": "npm install && cd views/frontend && npm install"
 }
