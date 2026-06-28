@@ -11,10 +11,5 @@
       "source": "/(.*)",
       "destination": "/index.html"
     }
-  ],
-  "functions": {
-    "api/catchall.js": {
-      "maxDuration": 30
-    }
-  }
+  ]
 }
