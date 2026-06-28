@@ -1,1 +1,1 @@
-{"version":3,"file":"subscription.js","sourceRoot":"","sources":["../../../views/backend/src/models/subscription.ts"],"names":[],"mappings":""}
+{"version":3,"file":"subscription.js","sourceRoot":"","sources":["../../src/models/subscription.ts"],"names":[],"mappings":""}

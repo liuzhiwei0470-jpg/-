@@ -2,19 +2,14 @@
   "buildCommand": "cd views/frontend && npm run build",
   "outputDirectory": "views/frontend/dist",
   "installCommand": "npm install && cd views/frontend && npm install",
-  "functions": {
-    "api/**/*.js": {
-      "runtime": "vercel-node"
-    }
-  },
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
+      "source": "/api/:path*",
+      "destination": "/api/:path*"
     },
     {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }

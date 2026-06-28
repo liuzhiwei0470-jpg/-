@@ -67,6 +67,26 @@ export async function initDatabase() {
       FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
     );
   `);
+    try {
+        await client.execute('ALTER TABLE subscriptions ADD COLUMN filter_include TEXT');
+    }
+    catch (e) { }
+    try {
+        await client.execute('ALTER TABLE subscriptions ADD COLUMN filter_exclude TEXT');
+    }
+    catch (e) { }
+    try {
+        await client.execute('ALTER TABLE subscriptions ADD COLUMN refresh_times TEXT');
+    }
+    catch (e) { }
+    try {
+        await client.execute('ALTER TABLE subscriptions ADD COLUMN refresh_interval INTEGER DEFAULT 120');
+    }
+    catch (e) { }
+    try {
+        await client.execute('ALTER TABLE subscriptions ADD COLUMN tags TEXT');
+    }
+    catch (e) { }
     await client.executeMultiple(`
     CREATE TABLE IF NOT EXISTS articles (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

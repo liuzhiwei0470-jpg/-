@@ -1,9 +1,9 @@
-module.exports = (req, res) => {
-  res.json({
+export default function handler(req, res) {
+  res.status(200).json({
     success: true,
     data: {
       status: 'ok',
       timestamp: new Date().toISOString(),
     },
   });
-};
+}

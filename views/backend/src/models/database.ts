@@ -82,6 +82,22 @@ export async function initDatabase() {
     );
   `);
 
+  try {
+    await client.execute('ALTER TABLE subscriptions ADD COLUMN filter_include TEXT');
+  } catch (e) {}
+  try {
+    await client.execute('ALTER TABLE subscriptions ADD COLUMN filter_exclude TEXT');
+  } catch (e) {}
+  try {
+    await client.execute('ALTER TABLE subscriptions ADD COLUMN refresh_times TEXT');
+  } catch (e) {}
+  try {
+    await client.execute('ALTER TABLE subscriptions ADD COLUMN refresh_interval INTEGER DEFAULT 120');
+  } catch (e) {}
+  try {
+    await client.execute('ALTER TABLE subscriptions ADD COLUMN tags TEXT');
+  } catch (e) {}
+
   await client.executeMultiple(`
     CREATE TABLE IF NOT EXISTS articles (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -102,6 +118,16 @@ export async function initDatabase() {
       UNIQUE(subscription_id, guid)
     );
   `);
+
+  try {
+    await client.execute('ALTER TABLE articles ADD COLUMN content_snippet TEXT');
+  } catch (e) {}
+  try {
+    await client.execute('ALTER TABLE articles ADD COLUMN full_content TEXT');
+  } catch (e) {}
+  try {
+    await client.execute('ALTER TABLE articles ADD COLUMN share_token TEXT');
+  } catch (e) {}
 
   await client.executeMultiple(`
     CREATE TABLE IF NOT EXISTS user_settings (

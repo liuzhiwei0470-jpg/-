@@ -1,1 +1,1 @@
-{"version":3,"file":"init-db.js","sourceRoot":"","sources":["../../../views/backend/src/scripts/init-db.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,YAAY,EAAE,MAAM,oBAAoB,CAAC;AAElD,OAAO,CAAC,GAAG,CAAC,aAAa,CAAC,CAAC;AAC3B,YAAY,EAAE,CAAC;AACf,OAAO,CAAC,GAAG,CAAC,WAAW,CAAC,CAAC"}
+{"version":3,"file":"init-db.js","sourceRoot":"","sources":["../../src/scripts/init-db.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,YAAY,EAAE,MAAM,oBAAoB,CAAC;AAElD,OAAO,CAAC,GAAG,CAAC,aAAa,CAAC,CAAC;AAC3B,YAAY,EAAE,CAAC;AACf,OAAO,CAAC,GAAG,CAAC,WAAW,CAAC,CAAC"}
