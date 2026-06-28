@@ -10,9 +10,9 @@ import {
   articleRoutes,
   settingsRoutes,
   shareRoutes,
-} from '../views/backend/src/routes';
-import { errorHandler, notFoundHandler } from '../views/backend/src/middleware';
-import { initDatabase } from '../views/backend/src/models/database';
+} from './_backend/routes';
+import { errorHandler, notFoundHandler } from './_backend/middleware';
+import { initDatabase } from './_backend/models/database';
 
 let dbInitialized = false;
 

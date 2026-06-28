@@ -1,0 +1,24 @@
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import { authRoutes, subscriptionRoutes, categoryRoutes, healthRoutes, articleRoutes, settingsRoutes, shareRoutes } from './routes/index.js';
+import { errorHandler, notFoundHandler } from './middleware/index.js';
+
+const app = express();
+
+app.use(helmet());
+app.use(cors());
+app.use(express.json());
+
+app.use('/api', healthRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api', shareRoutes);
+app.use('/api/subscriptions', articleRoutes);
+app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/categories', categoryRoutes);
+app.use('/api', settingsRoutes);
+
+app.use(notFoundHandler);
+app.use(errorHandler);
+
+export default app;
