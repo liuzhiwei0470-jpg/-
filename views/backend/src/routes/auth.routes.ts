@@ -46,21 +46,25 @@ router.post('/login', validateBody(loginSchema), async (req, res, next) => {
 });
 
 // 获取当前用户
-router.get('/me', authMiddleware, (req, res) => {
-  const user = authService.getUserById(req.user!.userId);
-  if (!user) {
-    return res.status(404).json({
-      success: false,
-      error: {
-        code: 'NOT_FOUND',
-        message: '用户不存在',
-      },
+router.get('/me', authMiddleware, async (req, res, next) => {
+  try {
+    const user = await authService.getUserById(req.user!.userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: 'NOT_FOUND',
+          message: '用户不存在',
+        },
+      });
+    }
+    res.json({
+      success: true,
+      data: user,
     });
+  } catch (error) {
+    next(error);
   }
-  res.json({
-    success: true,
-    data: user,
-  });
 });
 
 export default router;

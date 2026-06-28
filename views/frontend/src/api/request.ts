@@ -1,8 +1,9 @@
 import axios from 'axios';
 import { useToast } from '@/composables/useToast';
+import { API_BASE_URL } from './config';
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE_URL,
   timeout: 15000,
 });
 

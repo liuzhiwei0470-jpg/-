@@ -2,7 +2,8 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { subscriptionService, rssService } from '../services/index.js';
 import { authMiddleware, validateBody, validateQuery } from '../middleware/index.js';
-import { ROUTE_TAGS } from '../models/database.js';
+
+const ROUTE_TAGS: Record<string, string[]> = {};
 
 const router = Router();
 
@@ -109,110 +110,130 @@ router.get('/routes', (req, res) => {
 });
 
 // 获取订阅列表
-router.get('/', validateQuery(listSchema), (req, res) => {
-  const { page, limit, categoryId } = req.query as { page: number; limit: number; categoryId?: number };
-  const offset = (page - 1) * limit;
+router.get('/', validateQuery(listSchema), async (req, res, next) => {
+  try {
+    const { page, limit, categoryId } = req.query as { page: number; limit: number; categoryId?: number };
+    const offset = (page - 1) * limit;
 
-  const subscriptions = subscriptionService.getByUserId(req.user!.userId, categoryId);
-  const total = subscriptions.length;
+    const subscriptions = await subscriptionService.getByUserId(req.user!.userId, categoryId);
+    const total = subscriptions.length;
 
-  res.json({
-    success: true,
-    data: {
-      list: subscriptions.slice(offset, offset + limit),
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
+    res.json({
+      success: true,
+      data: {
+        list: subscriptions.slice(offset, offset + limit),
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
       },
-    },
-  });
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 // 获取单个订阅
-router.get('/:id', (req, res) => {
-  const subscription = subscriptionService.getById(parseInt(req.params.id));
-  if (!subscription || subscription.userId !== req.user!.userId) {
-    return res.status(404).json({
-      success: false,
-      error: {
-        code: 'NOT_FOUND',
-        message: '订阅不存在',
-      },
+router.get('/:id', async (req, res, next) => {
+  try {
+    const subscription = await subscriptionService.getById(parseInt(req.params.id));
+    if (!subscription || subscription.userId !== req.user!.userId) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: 'NOT_FOUND',
+          message: '订阅不存在',
+        },
+      });
+    }
+    res.json({
+      success: true,
+      data: subscription,
     });
+  } catch (error) {
+    next(error);
   }
-  res.json({
-    success: true,
-    data: subscription,
-  });
 });
 
 // 创建订阅
-router.post('/', validateBody(createSchema), async (req, res) => {
-  const subscription = subscriptionService.create({
-    ...req.body,
-    userId: req.user!.userId,
-  });
-
-  // 自动同步一次文章
+router.post('/', validateBody(createSchema), async (req, res, next) => {
   try {
-    await rssService.syncSubscription(
-      subscription.id,
-      subscription.routeUrl,
-      subscription.filterInclude,
-      subscription.filterExclude
-    );
-  } catch (error) {
-    console.error('首次同步失败:', error);
-  }
+    const subscription = await subscriptionService.create({
+      ...req.body,
+      userId: req.user!.userId,
+    });
 
-  res.status(201).json({
-    success: true,
-    data: subscription,
-    message: '订阅创建成功',
-  });
+    // 自动同步一次文章
+    try {
+      await rssService.syncSubscription(
+        subscription.id,
+        subscription.routeUrl,
+        subscription.filterInclude,
+        subscription.filterExclude
+      );
+    } catch (error) {
+      console.error('首次同步失败:', error);
+    }
+
+    res.status(201).json({
+      success: true,
+      data: subscription,
+      message: '订阅创建成功',
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 // 更新订阅
-router.put('/:id', validateBody(updateSchema), (req, res) => {
-  const subscription = subscriptionService.update(
-    parseInt(req.params.id),
-    req.user!.userId,
-    req.body
-  );
-  if (!subscription) {
-    return res.status(404).json({
-      success: false,
-      error: {
-        code: 'NOT_FOUND',
-        message: '订阅不存在',
-      },
+router.put('/:id', validateBody(updateSchema), async (req, res, next) => {
+  try {
+    const subscription = await subscriptionService.update(
+      parseInt(req.params.id),
+      req.user!.userId,
+      req.body
+    );
+    if (!subscription) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: 'NOT_FOUND',
+          message: '订阅不存在',
+        },
+      });
+    }
+    res.json({
+      success: true,
+      data: subscription,
+      message: '订阅更新成功',
     });
+  } catch (error) {
+    next(error);
   }
-  res.json({
-    success: true,
-    data: subscription,
-    message: '订阅更新成功',
-  });
 });
 
 // 删除订阅
-router.delete('/:id', (req, res) => {
-  const deleted = subscriptionService.delete(parseInt(req.params.id), req.user!.userId);
-  if (!deleted) {
-    return res.status(404).json({
-      success: false,
-      error: {
-        code: 'NOT_FOUND',
-        message: '订阅不存在',
-      },
+router.delete('/:id', async (req, res, next) => {
+  try {
+    const deleted = await subscriptionService.delete(parseInt(req.params.id), req.user!.userId);
+    if (!deleted) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: 'NOT_FOUND',
+          message: '订阅不存在',
+        },
+      });
+    }
+    res.json({
+      success: true,
+      message: '订阅删除成功',
     });
+  } catch (error) {
+    next(error);
   }
-  res.json({
-    success: true,
-    message: '订阅删除成功',
-  });
 });
 
 export default router;

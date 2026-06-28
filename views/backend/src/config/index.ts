@@ -14,7 +14,8 @@ export const config = {
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
   },
   database: {
-    path: process.env.DATABASE_PATH || path.resolve(__dirname, '../../', 'data/database.db'),
+    url: process.env.TURSO_DATABASE_URL || process.env.DATABASE_URL || '',
+    token: process.env.TURSO_AUTH_TOKEN || process.env.DATABASE_TOKEN || '',
   },
   app: {
     baseUrl: process.env.APP_BASE_URL || 'http://localhost:6001',

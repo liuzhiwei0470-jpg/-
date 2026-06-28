@@ -1,5 +1,5 @@
 import Parser from 'rss-parser';
-import db from '../models/database.js';
+import { getRow, getAllRows, runSql } from '../models/database.js';
 import type { Article, ArticleResponse } from '../models/article.js';
 import { config } from '../config/index.js';
 
@@ -30,9 +30,7 @@ export interface ParsedItem {
 }
 
 export class RssService {
-  // 解析RSS源
   async parseFeed(url: string): Promise<ParsedFeed> {
-    // 如果是路由路径，补全RSSHub地址
     let fullUrl = url;
     if (url.startsWith('/')) {
       fullUrl = DEFAULT_RSSHUB_BASE + url;
@@ -56,7 +54,6 @@ export class RssService {
     };
   }
 
-  // 检查文章是否匹配关键词过滤规则
   private matchFilters(title: string, contentSnippet: string, filterInclude: string | null, filterExclude: string | null): boolean {
     const text = (title + ' ' + contentSnippet).toLowerCase();
     
@@ -88,7 +85,6 @@ export class RssService {
     return true;
   }
 
-  // 同步订阅文章到数据库
   async syncSubscription(subscriptionId: number, routeUrl: string, filterInclude?: string | null, filterExclude?: string | null): Promise<number> {
     try {
       const feed = await this.parseFeed(routeUrl);
@@ -99,15 +95,16 @@ export class RssService {
           continue;
         }
 
-        const existing = db.prepare(
-          'SELECT id FROM articles WHERE subscription_id = ? AND guid = ?'
-        ).get(subscriptionId, item.guid);
+        const existing = await getRow(
+          'SELECT id FROM articles WHERE subscription_id = ? AND guid = ?',
+          subscriptionId,
+          item.guid
+        );
 
         if (!existing) {
-          db.prepare(`
-            INSERT INTO articles (subscription_id, guid, title, link, content, content_snippet, author, published)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-          `).run(
+          await runSql(
+            `INSERT INTO articles (subscription_id, guid, title, link, content, content_snippet, author, published)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             subscriptionId,
             item.guid,
             item.title,
@@ -128,14 +125,14 @@ export class RssService {
     }
   }
 
-  // 清理旧文章（保留收藏和已提取的）
-  cleanupOldArticles(days: number = 30, subscriptionId?: number, userId?: number): number {
+  async cleanupOldArticles(days: number = 30, subscriptionId?: number, userId?: number): Promise<number> {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - days);
     const cutoffStr = cutoffDate.toISOString();
 
     let whereClause = `WHERE is_favorite = 0
       AND (full_content IS NULL OR full_content = '')
+      AND (share_token IS NULL OR share_token = '')
       AND published < ?`;
     const params: any[] = [cutoffStr];
 
@@ -144,7 +141,6 @@ export class RssService {
       params.push(subscriptionId);
     }
 
-    // 如果指定了用户ID，只清理该用户的订阅文章
     if (userId !== undefined) {
       whereClause += ` AND subscription_id IN (
         SELECT id FROM subscriptions WHERE user_id = ?
@@ -152,62 +148,68 @@ export class RssService {
       params.push(userId);
     }
 
-    const result = db.prepare(
-      `DELETE FROM articles ${whereClause}`
-    ).run(...params);
-
+    const result = await runSql(`DELETE FROM articles ${whereClause}`, ...params);
     return result.changes || 0;
   }
 
-  // 获取文章统计信息
-  getArticleStats(): { total: number; favorite: number; shared: number; old: number } {
-    const total = (db.prepare('SELECT COUNT(*) as count FROM articles').get() as any).count;
-    const favorite = (db.prepare('SELECT COUNT(*) as count FROM articles WHERE is_favorite = 1').get() as any).count;
-    const shared = (db.prepare("SELECT COUNT(*) as count FROM articles WHERE share_token IS NOT NULL AND share_token != ''").get() as any).count;
+  async getArticleStats(): Promise<{ total: number; favorite: number; shared: number; old: number }> {
+    const totalRow = await getRow('SELECT COUNT(*) as count FROM articles');
+    const favoriteRow = await getRow('SELECT COUNT(*) as count FROM articles WHERE is_favorite = 1');
+    const sharedRow = await getRow("SELECT COUNT(*) as count FROM articles WHERE share_token IS NOT NULL AND share_token != ''");
     
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const old = (db.prepare('SELECT COUNT(*) as count FROM articles WHERE is_favorite = 0 AND (full_content IS NULL OR full_content = \'\') AND (share_token IS NULL OR share_token = \'\') AND published < ?').get(thirtyDaysAgo.toISOString()) as any).count;
+    const oldRow = await getRow(
+      "SELECT COUNT(*) as count FROM articles WHERE is_favorite = 0 AND (full_content IS NULL OR full_content = '') AND (share_token IS NULL OR share_token = '') AND published < ?",
+      thirtyDaysAgo.toISOString()
+    );
 
-    return { total, favorite, shared, old };
+    return {
+      total: totalRow?.count || 0,
+      favorite: favoriteRow?.count || 0,
+      shared: sharedRow?.count || 0,
+      old: oldRow?.count || 0,
+    };
   }
 
-  // 删除单篇文章
-  deleteArticle(articleId: number, userId: number): boolean {
-    const article = db.prepare(
-      'SELECT a.* FROM articles a JOIN subscriptions s ON a.subscription_id = s.id WHERE a.id = ? AND s.user_id = ?'
-    ).get(articleId, userId) as any;
+  async deleteArticle(articleId: number, userId: number): Promise<boolean> {
+    const article = await getRow(
+      'SELECT a.id FROM articles a JOIN subscriptions s ON a.subscription_id = s.id WHERE a.id = ? AND s.user_id = ?',
+      articleId,
+      userId
+    );
 
     if (!article) {
       return false;
     }
 
-    db.prepare('DELETE FROM articles WHERE id = ?').run(articleId);
+    await runSql('DELETE FROM articles WHERE id = ?', articleId);
     return true;
   }
 
-  // 批量删除文章
-  deleteArticles(articleIds: number[], userId: number): number {
+  async deleteArticles(articleIds: number[], userId: number): Promise<number> {
     if (articleIds.length === 0) return 0;
 
     const placeholders = articleIds.map(() => '?').join(',');
-    const result = db.prepare(
+    const result = await runSql(
       `DELETE FROM articles WHERE id IN (${placeholders}) AND subscription_id IN (
         SELECT id FROM subscriptions WHERE user_id = ?
-      )`
-    ).run(...articleIds, userId);
+      )`,
+      ...articleIds,
+      userId
+    );
 
     return result.changes || 0;
   }
 
-  // 按条件删除文章
-  deleteArticlesByCondition(userId: number, condition: {
+  async deleteArticlesByCondition(userId: number, condition: {
     isRead?: boolean;
     isFavorite?: boolean;
     hasFullContent?: boolean;
+    hasShareToken?: boolean;
     olderThanDays?: number;
     subscriptionId?: number;
-  }): number {
+  }): Promise<number> {
     let whereClause = 'WHERE subscription_id IN (SELECT id FROM subscriptions WHERE user_id = ?)';
     const params: any[] = [userId];
 
@@ -226,6 +228,13 @@ export class RssService {
         whereClause += " AND (full_content IS NULL OR full_content = '')";
       }
     }
+    if (condition.hasShareToken !== undefined) {
+      if (condition.hasShareToken) {
+        whereClause += " AND share_token IS NOT NULL AND share_token != ''";
+      } else {
+        whereClause += " AND (share_token IS NULL OR share_token = '')";
+      }
+    }
     if (condition.olderThanDays !== undefined) {
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - condition.olderThanDays);
@@ -237,20 +246,16 @@ export class RssService {
       params.push(condition.subscriptionId);
     }
 
-    const result = db.prepare(
-      `DELETE FROM articles ${whereClause}`
-    ).run(...params);
-
+    const result = await runSql(`DELETE FROM articles ${whereClause}`, ...params);
     return result.changes || 0;
   }
 
-  // 获取文章列表
-  getArticles(
+  async getArticles(
     subscriptionId: number,
     page: number = 1,
     limit: number = 20,
     filters: { isRead?: boolean; isFavorite?: boolean; hasFullContent?: boolean; hasShareToken?: boolean; sort?: 'newest' | 'oldest'; search?: string } = {}
-  ): { list: ArticleResponse[]; total: number } {
+  ): Promise<{ list: ArticleResponse[]; total: number }> {
     const offset = (page - 1) * limit;
 
     let whereClause = 'WHERE subscription_id = ?';
@@ -266,16 +271,16 @@ export class RssService {
     }
     if (filters.hasFullContent !== undefined) {
       if (filters.hasFullContent) {
-        whereClause += ' AND full_content IS NOT NULL AND full_content != \'\'';
+        whereClause += " AND full_content IS NOT NULL AND full_content != ''";
       } else {
-        whereClause += ' AND (full_content IS NULL OR full_content = \'\')';
+        whereClause += " AND (full_content IS NULL OR full_content = '')";
       }
     }
     if (filters.hasShareToken !== undefined) {
       if (filters.hasShareToken) {
-        whereClause += ' AND share_token IS NOT NULL AND share_token != \'\'';
+        whereClause += " AND share_token IS NOT NULL AND share_token != ''";
       } else {
-        whereClause += ' AND (share_token IS NULL OR share_token = \'\')';
+        whereClause += " AND (share_token IS NULL OR share_token = '')";
       }
     }
     if (filters.search) {
@@ -284,24 +289,27 @@ export class RssService {
       params.push(searchPattern, searchPattern);
     }
 
-    const totalResult = db.prepare(
-      `SELECT COUNT(*) as count FROM articles ${whereClause}`
-    ).get(...params) as { count: number };
+    const totalResult = await getRow(
+      `SELECT COUNT(*) as count FROM articles ${whereClause}`,
+      ...params
+    );
 
     const sortOrder = filters.sort === 'oldest' ? 'ASC' : 'DESC';
 
-    const rows = db.prepare(
-      `SELECT * FROM articles ${whereClause} ORDER BY published ${sortOrder}, id ${sortOrder} LIMIT ? OFFSET ?`
-    ).all(...params, limit, offset) as Article[];
+    const rows = await getAllRows(
+      `SELECT * FROM articles ${whereClause} ORDER BY published ${sortOrder}, id ${sortOrder} LIMIT ? OFFSET ?`,
+      ...params,
+      limit,
+      offset
+    ) as Article[];
 
     return {
       list: rows.map(row => this.toResponse(row)),
-      total: totalResult.count,
+      total: totalResult?.count || 0,
     };
   }
 
-  // 获取用户全部文章（跨订阅源）
-  getAllArticles(
+  async getAllArticles(
     userId: number,
     page: number = 1,
     limit: number = 20,
@@ -314,7 +322,7 @@ export class RssService {
       search?: string;
       sort?: 'newest' | 'oldest';
     } = {}
-  ): { list: (ArticleResponse & { subscriptionTitle?: string | null })[]; total: number } {
+  ): Promise<{ list: (ArticleResponse & { subscriptionTitle?: string | null })[]; total: number }> {
     const offset = (page - 1) * limit;
 
     let whereClause = 'WHERE s.user_id = ?';
@@ -334,16 +342,16 @@ export class RssService {
     }
     if (filters.hasFullContent !== undefined) {
       if (filters.hasFullContent) {
-        whereClause += ' AND a.full_content IS NOT NULL AND a.full_content != \'\'';
+        whereClause += " AND a.full_content IS NOT NULL AND a.full_content != ''";
       } else {
-        whereClause += ' AND (a.full_content IS NULL OR a.full_content = \'\')';
+        whereClause += " AND (a.full_content IS NULL OR a.full_content = '')";
       }
     }
     if (filters.hasShareToken !== undefined) {
       if (filters.hasShareToken) {
-        whereClause += ' AND a.share_token IS NOT NULL AND a.share_token != \'\'';
+        whereClause += " AND a.share_token IS NOT NULL AND a.share_token != ''";
       } else {
-        whereClause += ' AND (a.share_token IS NULL OR a.share_token = \'\')';
+        whereClause += " AND (a.share_token IS NULL OR a.share_token = '')";
       }
     }
     if (filters.search) {
@@ -352,40 +360,43 @@ export class RssService {
       params.push(searchTerm, searchTerm, searchTerm);
     }
 
-    const totalResult = db.prepare(
+    const totalResult = await getRow(
       `SELECT COUNT(*) as count FROM articles a
        JOIN subscriptions s ON a.subscription_id = s.id
-       ${whereClause}`
-    ).get(...params) as { count: number };
+       ${whereClause}`,
+      ...params
+    );
 
     const sortOrder = filters.sort === 'oldest' ? 'ASC' : 'DESC';
 
-    const rows = db.prepare(
+    const rows = await getAllRows(
       `SELECT a.*, s.title as subscription_title FROM articles a
        JOIN subscriptions s ON a.subscription_id = s.id
        ${whereClause}
        ORDER BY a.published ${sortOrder}, a.id ${sortOrder}
-       LIMIT ? OFFSET ?`
-    ).all(...params, limit, offset) as (Article & { subscription_title?: string | null })[];
+       LIMIT ? OFFSET ?`,
+      ...params,
+      limit,
+      offset
+    ) as (Article & { subscription_title?: string | null })[];
 
     return {
       list: rows.map(row => ({
         ...this.toResponse(row),
         subscriptionTitle: row.subscription_title,
       })),
-      total: totalResult.count,
+      total: totalResult?.count || 0,
     };
   }
 
-  // 获取用户未读计数（按订阅源分组）
-  getUnreadCount(userId: number): { total: number; bySubscription: Record<number, number> } {
-    const rows = db.prepare(`
+  async getUnreadCount(userId: number): Promise<{ total: number; bySubscription: Record<number, number> }> {
+    const rows = await getAllRows(`
       SELECT s.id as subscription_id, COUNT(a.id) as count
       FROM subscriptions s
       LEFT JOIN articles a ON s.id = a.subscription_id AND a.is_read = 0
       WHERE s.user_id = ?
       GROUP BY s.id
-    `).all(userId) as { subscription_id: number; count: number }[];
+    `, userId) as { subscription_id: number; count: number }[];
 
     const bySubscription: Record<number, number> = {};
     let total = 0;
@@ -397,76 +408,74 @@ export class RssService {
     return { total, bySubscription };
   }
 
-  // 全局标记全部已读（所有订阅的未读文章）
-  markAllAsReadGlobal(userId: number): number {
-    const result = db.prepare(`
+  async markAllAsReadGlobal(userId: number): Promise<number> {
+    const result = await runSql(`
       UPDATE articles
       SET is_read = 1
       WHERE subscription_id IN (
         SELECT id FROM subscriptions WHERE user_id = ?
       ) AND is_read = 0
-    `).run(userId);
+    `, userId);
     return result.changes;
   }
 
-  // 获取单篇文章
-  getArticle(articleId: number): ArticleResponse | null {
-    const row = db.prepare('SELECT * FROM articles WHERE id = ?').get(articleId) as Article | undefined;
+  async getArticle(articleId: number): Promise<ArticleResponse | null> {
+    const row = await getRow('SELECT * FROM articles WHERE id = ?', articleId) as Article | undefined;
     if (!row) return null;
     return this.toResponse(row);
   }
 
-  // 标记已读/未读
-  markAsRead(articleId: number, isRead: boolean = true): boolean {
-    const result = db.prepare(
-      'UPDATE articles SET is_read = ? WHERE id = ?'
-    ).run(isRead ? 1 : 0, articleId);
+  async markAsRead(articleId: number, isRead: boolean = true): Promise<boolean> {
+    const result = await runSql(
+      'UPDATE articles SET is_read = ? WHERE id = ?',
+      isRead ? 1 : 0,
+      articleId
+    );
     return result.changes > 0;
   }
 
-  // 全部标记已读
-  markAllAsRead(subscriptionId: number): number {
-    const result = db.prepare(
-      'UPDATE articles SET is_read = 1 WHERE subscription_id = ? AND is_read = 0'
-    ).run(subscriptionId);
+  async markAllAsRead(subscriptionId: number): Promise<number> {
+    const result = await runSql(
+      'UPDATE articles SET is_read = 1 WHERE subscription_id = ? AND is_read = 0',
+      subscriptionId
+    );
     return result.changes;
   }
 
-  // 批量标记已读/未读
-  batchMarkAsRead(articleIds: number[], isRead: boolean = true): number {
+  async batchMarkAsRead(articleIds: number[], isRead: boolean = true): Promise<number> {
     if (articleIds.length === 0) return 0;
 
     const placeholders = articleIds.map(() => '?').join(',');
-    const result = db.prepare(
-      `UPDATE articles SET is_read = ? WHERE id IN (${placeholders})`
-    ).run(isRead ? 1 : 0, ...articleIds);
+    const result = await runSql(
+      `UPDATE articles SET is_read = ? WHERE id IN (${placeholders})`,
+      isRead ? 1 : 0,
+      ...articleIds
+    );
     return result.changes;
   }
 
-  // 收藏/取消收藏
-  toggleFavorite(articleId: number): boolean {
-    const article = db.prepare('SELECT is_favorite FROM articles WHERE id = ?').get(articleId) as Article | undefined;
+  async toggleFavorite(articleId: number): Promise<boolean> {
+    const article = await getRow('SELECT is_favorite FROM articles WHERE id = ?', articleId) as Article | undefined;
     if (!article) return false;
 
     const newFavorite = article.is_favorite ? 0 : 1;
-    db.prepare('UPDATE articles SET is_favorite = ? WHERE id = ?').run(newFavorite, articleId);
+    await runSql('UPDATE articles SET is_favorite = ? WHERE id = ?', newFavorite, articleId);
     return !!newFavorite;
   }
 
-  // 验证订阅所有权
-  verifyOwnership(articleId: number, userId: number): boolean {
-    const row = db.prepare(`
+  async verifyOwnership(articleId: number, userId: number): Promise<boolean> {
+    const row = await getRow(`
       SELECT a.id FROM articles a
       JOIN subscriptions s ON a.subscription_id = s.id
       WHERE a.id = ? AND s.user_id = ?
-    `).get(articleId, userId);
+    `, articleId, userId);
     return !!row;
   }
 
-  // 转换SQLite时间字符串为ISO格式（SQLite的CURRENT_TIMESTAMP是UTC时间）
   private toIsoDate(dateStr: string | null | undefined): string | null {
     if (!dateStr) return null;
     let date: Date;
+    if (typeof dateStr !== 'string') return null;
     if (dateStr.includes('T') && dateStr.endsWith('Z')) {
       date = new Date(dateStr);
     } else if (dateStr.includes('T')) {
@@ -480,38 +489,37 @@ export class RssService {
     return date.toISOString();
   }
 
-  // 获取相邻文章
-  getAdjacentArticles(
+  async getAdjacentArticles(
     articleId: number,
     userId: number
-  ): { prev: ArticleResponse | null; next: ArticleResponse | null } {
-    const article = db.prepare(`
+  ): Promise<{ prev: ArticleResponse | null; next: ArticleResponse | null }> {
+    const article = await getRow(`
       SELECT a.* FROM articles a
       JOIN subscriptions s ON a.subscription_id = s.id
       WHERE a.id = ? AND s.user_id = ?
-    `).get(articleId, userId) as Article | undefined;
+    `, articleId, userId) as Article | undefined;
 
     if (!article) {
       return { prev: null, next: null };
     }
 
-    const prevArticle = db.prepare(`
+    const prevArticle = await getRow(`
       SELECT a.* FROM articles a
       JOIN subscriptions s ON a.subscription_id = s.id
       WHERE s.user_id = ?
         AND (a.published > ? OR (a.published = ? AND a.id > ?))
       ORDER BY a.published ASC, a.id ASC
       LIMIT 1
-    `).get(userId, article.published, article.published, article.id) as Article | undefined;
+    `, userId, article.published, article.published, article.id) as Article | undefined;
 
-    const nextArticle = db.prepare(`
+    const nextArticle = await getRow(`
       SELECT a.* FROM articles a
       JOIN subscriptions s ON a.subscription_id = s.id
       WHERE s.user_id = ?
         AND (a.published < ? OR (a.published = ? AND a.id < ?))
       ORDER BY a.published DESC, a.id DESC
       LIMIT 1
-    `).get(userId, article.published, article.published, article.id) as Article | undefined;
+    `, userId, article.published, article.published, article.id) as Article | undefined;
 
     return {
       prev: prevArticle ? this.toResponse(prevArticle) : null,
@@ -519,15 +527,13 @@ export class RssService {
     };
   }
 
-  // 生成分享链接
-  generateShareToken(articleId: number, userId: number): { success: boolean; shareToken?: string; shareUrl?: string } {
-    // 验证文章所有权
-    const article = db.prepare(`
+  async generateShareToken(articleId: number, userId: number): Promise<{ success: boolean; shareToken?: string; shareUrl?: string }> {
+    const article = await getRow(`
       SELECT a.*, s.user_id, s.title as subscription_title
       FROM articles a
       JOIN subscriptions s ON a.subscription_id = s.id
       WHERE a.id = ?
-    `).get(articleId) as (Article & { user_id: number; subscription_title: string }) | undefined;
+    `, articleId) as (Article & { user_id: number; subscription_title: string }) | undefined;
 
     if (!article) {
       return { success: false };
@@ -537,7 +543,6 @@ export class RssService {
       return { success: false };
     }
 
-    // 如果已经有token，直接返回
     if (article.share_token) {
       const baseUrl = config.app.baseUrl || 'http://localhost:6001';
       return {
@@ -547,9 +552,8 @@ export class RssService {
       };
     }
 
-    // 生成新的token
     const token = this.generateToken();
-    db.prepare('UPDATE articles SET share_token = ? WHERE id = ?').run(token, articleId);
+    await runSql('UPDATE articles SET share_token = ? WHERE id = ?', token, articleId);
 
     const baseUrl = config.app.baseUrl || 'http://localhost:6001';
     return {
@@ -559,8 +563,7 @@ export class RssService {
     };
   }
 
-  // 根据分享token获取文章（公开接口，无需登录）
-  getArticleByShareToken(token: string): {
+  async getArticleByShareToken(token: string): Promise<{
     id: number;
     title: string | null;
     content: string | null;
@@ -568,13 +571,13 @@ export class RssService {
     published: string | null;
     subscriptionTitle: string;
     link: string | null;
-  } | null {
-    const article = db.prepare(`
+  } | null> {
+    const article = await getRow(`
       SELECT a.id, a.title, a.content, a.author, a.published, a.link, s.title as subscription_title
       FROM articles a
       JOIN subscriptions s ON a.subscription_id = s.id
       WHERE a.share_token = ?
-    `).get(token) as (Article & { subscription_title: string }) | undefined;
+    `, token) as (Article & { subscription_title: string }) | undefined;
 
     if (!article) {
       return null;
@@ -591,7 +594,6 @@ export class RssService {
     };
   }
 
-  // 生成随机token
   private generateToken(): string {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     let token = '';
@@ -601,7 +603,6 @@ export class RssService {
     return token;
   }
 
-  // 转换响应格式
   private toResponse(row: Article): ArticleResponse {
     return {
       id: row.id,

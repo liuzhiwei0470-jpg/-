@@ -1,32 +1,29 @@
 import { RssService } from './rss.service.js';
-import db from '../models/database.js';
+import { getRow, runSql } from '../models/database.js';
 import type { Article } from '../models/article.js';
 
 const rssService = new RssService();
 
-// 获取文章内容（从数据库）
-function getArticleContent(articleId: number): Article | null {
-  const article = db.prepare('SELECT * FROM articles WHERE id = ?').get(articleId) as Article | undefined;
+async function getArticleContent(articleId: number): Promise<Article | null> {
+  const article = await getRow('SELECT * FROM articles WHERE id = ?', articleId) as Article | undefined;
   return article || null;
 }
 
-// 验证文章所有权
-function verifyOwnership(articleId: number, userId: number): boolean {
-  const article = db.prepare(`
+async function verifyOwnership(articleId: number, userId: number): Promise<boolean> {
+  const article = await getRow(`
     SELECT a.id FROM articles a
     JOIN subscriptions s ON a.subscription_id = s.id
     WHERE a.id = ? AND s.user_id = ?
-  `).get(articleId, userId);
+  `, articleId, userId);
   return !!article;
 }
 
-// 提取全文（从原始链接）
 async function extractFullContent(articleId: number, userId: number): Promise<{ success: boolean; content?: string; error?: string; source?: 'web' | 'rss' }> {
-  if (!verifyOwnership(articleId, userId)) {
+  if (!(await verifyOwnership(articleId, userId))) {
     return { success: false, error: '文章不存在' };
   }
 
-  const article = getArticleContent(articleId);
+  const article = await getArticleContent(articleId);
   if (!article) {
     return { success: false, error: '文章不存在' };
   }
@@ -38,12 +35,11 @@ async function extractFullContent(articleId: number, userId: number): Promise<{ 
 
     console.log(`[全文提取] 开始提取文章 ${articleId}: ${article.link}`);
 
-    // 方案一：从原网站提取
     if (article.link) {
       try {
         const webResult = await extractFromWebsite(article.link, Readability, JSDOM, Turndown);
         if (webResult.success && webResult.content) {
-          db.prepare('UPDATE articles SET full_content = ? WHERE id = ?').run(webResult.content, articleId);
+          await runSql('UPDATE articles SET full_content = ? WHERE id = ?', webResult.content, articleId);
           console.log(`[全文提取] 原网站提取成功，长度: ${webResult.content.length}`);
           return { success: true, content: webResult.content, source: 'web' };
         }
@@ -53,11 +49,9 @@ async function extractFullContent(articleId: number, userId: number): Promise<{ 
       }
     }
 
-    // 方案二：使用 RSS 已有内容作为 fallback
     if (article.content && article.content.length > 200) {
       console.log(`[全文提取] 使用 RSS 内容作为全文，原始长度: ${article.content.length}`);
       
-      // 用 readability 清洗一下 RSS 内容（去掉多余标签等）
       const dom = new JSDOM(article.content, { url: article.link || undefined });
       const reader = new Readability(dom.window.document, {
         charThreshold: 50,
@@ -69,7 +63,6 @@ async function extractFullContent(articleId: number, userId: number): Promise<{ 
         htmlContent = parsed.content;
       }
       
-      // 转成 Markdown
       const turndown = new Turndown({
         headingStyle: 'atx',
         codeBlockStyle: 'fenced',
@@ -80,7 +73,7 @@ async function extractFullContent(articleId: number, userId: number): Promise<{ 
 
       turndown.addRule('images', {
         filter: 'img',
-        replacement: function (content, node) {
+        replacement: function (content: string, node: any) {
           const alt = node.getAttribute('alt') || '';
           const src = node.getAttribute('src') || '';
           const title = node.getAttribute('title') || '';
@@ -90,14 +83,14 @@ async function extractFullContent(articleId: number, userId: number): Promise<{ 
 
       turndown.addRule('strikethrough', {
         filter: ['del', 's', 'strike'],
-        replacement: (content) => `~~${content}~~`,
+        replacement: (content: string) => `~~${content}~~`,
       });
 
       turndown.addRule('codeBlock', {
-        filter: function (node) {
+        filter: function (node: any) {
           return node.nodeName === 'PRE' && node.firstChild && node.firstChild.nodeName === 'CODE';
         },
-        replacement: function (content, node) {
+        replacement: function (content: string, node: any) {
           const codeNode = node.firstChild;
           const className = codeNode.getAttribute('class') || '';
           const langMatch = className.match(/language-(\w+)/);
@@ -108,12 +101,11 @@ async function extractFullContent(articleId: number, userId: number): Promise<{ 
 
       const fullContent = turndown.turndown(htmlContent);
       
-      db.prepare('UPDATE articles SET full_content = ? WHERE id = ?').run(fullContent, articleId);
+      await runSql('UPDATE articles SET full_content = ? WHERE id = ?', fullContent, articleId);
       console.log(`[全文提取] RSS 内容转换完成，Markdown 长度: ${fullContent.length}`);
       return { success: true, content: fullContent, source: 'rss' };
     }
 
-    // 都失败了
     console.log(`[全文提取] 所有提取方式都失败`);
     return { success: false, error: '无法提取正文内容，该网站可能有反爬机制或 RSS 内容过短' };
     
@@ -123,7 +115,6 @@ async function extractFullContent(articleId: number, userId: number): Promise<{ 
   }
 }
 
-// 从原网站提取全文
 async function extractFromWebsite(
   link: string,
   Readability: any,
@@ -150,7 +141,6 @@ async function extractFromWebsite(
       return { success: false, error: `HTTP ${response.status}` };
     }
 
-    // 处理编码
     const buffer = Buffer.from(await response.arrayBuffer());
     const contentType = response.headers.get('content-type') || '';
     let html: string;
@@ -194,7 +184,6 @@ async function extractFromWebsite(
       extractedHtml = articleResult.content;
       console.log(`[全文提取] Readability 提取成功, 长度: ${extractedHtml.length}`);
     } else {
-      // Fallback: 尝试常见选择器
       const doc = dom.window.document;
       const selectors = [
         'article',
@@ -268,13 +257,12 @@ async function extractFromWebsite(
   }
 }
 
-// 生成下载内容
 async function generateDownload(articleId: number, userId: number, format: 'md' | 'html' | 'docx'): Promise<{ success: boolean; content?: string | Buffer; filename?: string; error?: string; contentType?: string }> {
-  if (!verifyOwnership(articleId, userId)) {
+  if (!(await verifyOwnership(articleId, userId))) {
     return { success: false, error: '文章不存在' };
   }
 
-  const article = getArticleContent(articleId);
+  const article = await getArticleContent(articleId);
   if (!article) {
     return { success: false, error: '文章不存在' };
   }
@@ -338,7 +326,6 @@ async function generateDownload(articleId: number, userId: number, format: 'md' 
     const filename = `${title.replace(/[\\/:*?"<>|]/g, '_')}.html`;
     return { success: true, content: html, filename, contentType: 'text/html; charset=utf-8' };
   } else {
-    // docx 格式
     try {
       const { JSDOM } = await import('jsdom');
       const {
@@ -361,7 +348,6 @@ async function generateDownload(articleId: number, userId: number, format: 'md' 
 
       const children: any[] = [];
 
-      // 标题
       children.push(
         new Paragraph({
           text: title,
@@ -370,7 +356,6 @@ async function generateDownload(articleId: number, userId: number, format: 'md' 
         })
       );
 
-      // 元信息
       children.push(
         new Paragraph({
           children: [
@@ -393,7 +378,6 @@ async function generateDownload(articleId: number, userId: number, format: 'md' 
         );
       }
 
-      // 分隔线
       children.push(
         new Paragraph({
           border: {
@@ -403,19 +387,16 @@ async function generateDownload(articleId: number, userId: number, format: 'md' 
         })
       );
 
-      // 解析 HTML 内容，提取并下载图片
       const dom = new JSDOM(`<div>${content}</div>`);
       const parsedDoc = dom.window.document.querySelector('div')!;
 
-      // 下载所有图片并转为 base64
-      const imageMap = new Map<string, string>(); // src -> base64
+      const imageMap = new Map<string, string>();
       const imgTags = parsedDoc.querySelectorAll('img');
 
       for (const img of imgTags) {
         const src = img.getAttribute('src');
         if (src && !imageMap.has(src)) {
           try {
-            // 构建完整 URL（处理相对路径）
             let fullUrl = src;
             if (src.startsWith('//')) {
               fullUrl = 'https:' + src;
@@ -473,7 +454,6 @@ async function generateDownload(articleId: number, userId: number, format: 'md' 
       const contentElements = htmlToDocx(parsedDoc, docxLib, imageMap);
       children.push(...contentElements);
 
-      // 页脚信息
       children.push(
         new Paragraph({
           border: {
@@ -523,7 +503,6 @@ async function generateDownload(articleId: number, userId: number, format: 'md' 
   }
 }
 
-// HTML 转 docx 元素
 function htmlToDocx(element: Element, docxLib: any, imageMap?: Map<string, string>): any[] {
   const result: any[] = [];
   const {
@@ -544,7 +523,6 @@ function htmlToDocx(element: Element, docxLib: any, imageMap?: Map<string, strin
 
   function processNode(node: Node, isInline: boolean = false): any[] {
     if (node.nodeType === 3) {
-      // 文本节点
       const text = node.textContent || '';
       if (!text.trim() && !isInline) return [];
       return [new TextRun({ text, size: 22 }) ];
@@ -648,18 +626,14 @@ function htmlToDocx(element: Element, docxLib: any, imageMap?: Map<string, strin
         const src = el.getAttribute('src') || '';
         const alt = el.getAttribute('alt') || '图片';
 
-        // 尝试使用已下载的图片
         if (imageMap && imageMap.has(src)) {
           const base64Data = imageMap.get(src)!;
           try {
-            // 从 data URI 中提取 MIME 类型
             const mimeMatch = base64Data.match(/^data:([^;]+);base64,/);
             const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
 
-            // 将 data URI 转为纯 base64 字符串（去掉 data:xxx;base64, 前缀）
             const pureBase64 = base64Data.replace(/^data:[^;]+;base64,/, '');
 
-            // 确定图片类型（docx v9 使用字符串字面量）
             let imageType: "jpg" | "png" | "gif" | "bmp" = "png";
             if (mimeType.includes('jpeg') || mimeType.includes('jpg')) {
               imageType = "jpg";
@@ -675,8 +649,8 @@ function htmlToDocx(element: Element, docxLib: any, imageMap?: Map<string, strin
                   data: pureBase64,
                   type: imageType,
                   transformation: {
-                    width: 400,  // 最大宽度 400px
-                    height: 300, // 最大高度 300px（会根据比例调整）
+                    width: 400,
+                    height: 300,
                   },
                   alignment: AlignmentType.CENTER,
                 }),
@@ -689,7 +663,6 @@ function htmlToDocx(element: Element, docxLib: any, imageMap?: Map<string, strin
           }
         }
 
-        // 下载失败时，显示图片链接
         if (src) {
           return [new Paragraph({
             children: [
@@ -700,7 +673,6 @@ function htmlToDocx(element: Element, docxLib: any, imageMap?: Map<string, strin
           })];
         }
 
-        // 无 src 时显示占位符
         return [new Paragraph({
           children: [new TextRun({ text: `[图片: ${alt}]`, italics: true, color: '888888', size: 20 })],
           alignment: AlignmentType.CENTER,
@@ -765,7 +737,6 @@ function htmlToDocx(element: Element, docxLib: any, imageMap?: Map<string, strin
         });
         return divRuns;
       default:
-        // 未知标签，尝试提取文本
         const defaultText = el.textContent || '';
         if (defaultText.trim()) {
           return [new TextRun({ text: defaultText, size: 22 })];

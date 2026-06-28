@@ -1,17 +1,16 @@
-import db from '../models/database.js';
+import { getRow, getAllRows, runSql } from '../models/database.js';
 import type { Subscription, SubscriptionCreateInput, SubscriptionUpdateInput, SubscriptionResponse } from '../models/subscription.js';
 
-const DEFAULT_REFRESH_INTERVAL = 120; // 默认2小时
+const DEFAULT_REFRESH_INTERVAL = 120;
 
 export class SubscriptionService {
-  // 创建订阅
-  create(input: SubscriptionCreateInput): SubscriptionResponse {
+  async create(input: SubscriptionCreateInput): Promise<SubscriptionResponse> {
     const { userId, categoryId, routeUrl, title, config, filterKeywords, tags, filterInclude, filterExclude, refreshInterval } = input;
 
-    const result = db.prepare(`
+    const result = await runSql(`
       INSERT INTO subscriptions (user_id, category_id, route_url, title, config, filter_keywords, tags, filter_include, filter_exclude, refresh_interval)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
+    `,
       userId,
       categoryId ?? null,
       routeUrl,
@@ -24,11 +23,10 @@ export class SubscriptionService {
       refreshInterval ?? DEFAULT_REFRESH_INTERVAL
     );
 
-    return this.getById(result.lastInsertRowid as number)!;
+    return (await this.getById(result.lastInsertRowid))!;
   }
 
-  // 获取用户所有订阅
-  getByUserId(userId: number, categoryId?: number): SubscriptionResponse[] {
+  async getByUserId(userId: number, categoryId?: number): Promise<SubscriptionResponse[]> {
     let query = 'SELECT * FROM subscriptions WHERE user_id = ?';
     const params: any[] = [userId];
 
@@ -39,19 +37,21 @@ export class SubscriptionService {
 
     query += ' ORDER BY created_at DESC';
 
-    const rows = db.prepare(query).all(...params) as Subscription[];
-    return rows.map(row => this.toResponse(row));
+    const rows = await getAllRows(query, ...params) as Subscription[];
+    const responses: SubscriptionResponse[] = [];
+    for (const row of rows) {
+      responses.push(await this.toResponse(row));
+    }
+    return responses;
   }
 
-  // 获取单个订阅
-  getById(id: number): SubscriptionResponse | null {
-    const row = db.prepare('SELECT * FROM subscriptions WHERE id = ?').get(id) as Subscription | undefined;
+  async getById(id: number): Promise<SubscriptionResponse | null> {
+    const row = await getRow('SELECT * FROM subscriptions WHERE id = ?', id) as Subscription | undefined;
     if (!row) return null;
     return this.toResponse(row);
   }
 
-  // 更新订阅
-  update(id: number, userId: number, input: SubscriptionUpdateInput): SubscriptionResponse | null {
+  async update(id: number, userId: number, input: SubscriptionUpdateInput): Promise<SubscriptionResponse | null> {
     const updates: string[] = [];
     const params: any[] = [];
 
@@ -94,38 +94,37 @@ export class SubscriptionService {
 
     params.push(id, userId);
 
-    db.prepare(`
+    await runSql(`
       UPDATE subscriptions SET ${updates.join(', ')} WHERE id = ? AND user_id = ?
-    `).run(...params);
+    `, ...params);
 
     return this.getById(id);
   }
 
-  // 删除订阅
-  delete(id: number, userId: number): boolean {
-    const result = db.prepare('DELETE FROM subscriptions WHERE id = ? AND user_id = ?').run(id, userId);
+  async delete(id: number, userId: number): Promise<boolean> {
+    const result = await runSql('DELETE FROM subscriptions WHERE id = ? AND user_id = ?', id, userId);
     return result.changes > 0;
   }
 
-  // 获取订阅的文章统计
-  getArticleStats(subscriptionId: number): { total: number; unread: number } {
-    const totalResult = db.prepare(
-      'SELECT COUNT(*) as count FROM articles WHERE subscription_id = ?'
-    ).get(subscriptionId) as { count: number };
+  async getArticleStats(subscriptionId: number): Promise<{ total: number; unread: number }> {
+    const totalResult = await getRow(
+      'SELECT COUNT(*) as count FROM articles WHERE subscription_id = ?',
+      subscriptionId
+    );
 
-    const unreadResult = db.prepare(
-      'SELECT COUNT(*) as count FROM articles WHERE subscription_id = ? AND is_read = 0'
-    ).get(subscriptionId) as { count: number };
+    const unreadResult = await getRow(
+      'SELECT COUNT(*) as count FROM articles WHERE subscription_id = ? AND is_read = 0',
+      subscriptionId
+    );
 
     return {
-      total: totalResult.count,
-      unread: unreadResult.count,
+      total: totalResult?.count || 0,
+      unread: unreadResult?.count || 0,
     };
   }
 
-  // 转换响应格式
-  private toResponse(row: Subscription): SubscriptionResponse {
-    const stats = this.getArticleStats(row.id);
+  private async toResponse(row: Subscription): Promise<SubscriptionResponse> {
+    const stats = await this.getArticleStats(row.id);
     return {
       id: row.id,
       userId: row.user_id,

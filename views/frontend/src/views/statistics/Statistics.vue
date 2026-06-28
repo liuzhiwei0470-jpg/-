@@ -109,6 +109,7 @@ import {
   Package,
   TrendingUp
 } from 'lucide-vue-next';
+import { API_BASE_URL } from '@/api/config';
 
 const loading = ref(true);
 const stats = ref({
@@ -135,7 +136,7 @@ const readRate = computed(() => {
 
 async function loadStats() {
   try {
-    const articleRes = await fetch('/api/articles/stats', {
+    const articleRes = await fetch(`${API_BASE_URL}/articles/stats`, {
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
       },
@@ -148,7 +149,7 @@ async function loadStats() {
       stats.value.shared = articleData.data.shared || 0;
     }
 
-    const subRes = await fetch('/api/subscriptions', {
+    const subRes = await fetch(`${API_BASE_URL}/subscriptions`, {
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
       },

@@ -47,6 +47,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { ChevronLeft, ExternalLink } from 'lucide-vue-next';
+import { API_BASE_URL } from '@/api/config';
 
 interface ShareArticle {
   id: number;
@@ -88,7 +89,7 @@ const fetchArticle = async () => {
   }
 
   try {
-    const response = await fetch(`/api/share/${token}`);
+    const response = await fetch(`${API_BASE_URL}/share/${token}`);
     const data = await response.json();
     if (data.success) {
       article.value = data.data;
