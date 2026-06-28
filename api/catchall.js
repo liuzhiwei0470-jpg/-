@@ -1,15 +1,24 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import healthRoutes from './dist/routes/health.routes.js';
 
 const app = express();
+const Router = express.Router;
 
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
 
-app.use('/api', healthRoutes);
+// 健康检查路由
+app.get('/api/health', (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+    },
+  });
+});
 
 export default async function handler(req, res) {
   try {
