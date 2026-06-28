@@ -14,7 +14,7 @@ export const config = {
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
   },
   database: {
-    path: process.env.DATABASE_PATH || path.resolve(__dirname, '../../../../../', 'data/database.db'),
+    path: process.env.DATABASE_PATH || path.resolve(__dirname, '../../', 'data/database.db'),
   },
   app: {
     baseUrl: process.env.APP_BASE_URL || 'http://localhost:6001',

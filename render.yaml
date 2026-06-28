@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: geren-qingbaoguan-backend
+    env: node
+    plan: free
+    region: singapore
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    rootDir: views/backend
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: PORT
+        value: "10000"
+      - key: RSSHUB_BASE_URL
+        value: https://rsshub.app
