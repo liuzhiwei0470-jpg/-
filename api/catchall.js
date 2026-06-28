@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import { healthRoutes } from './dist/routes/index.js';
+import healthRoutes from './dist/routes/health.routes.js';
 
 const app = express();
 
