@@ -1,0 +1,20 @@
+{
+  "name": "geren-qingbaoguan-backend",
+  "version": "1.0.0",
+  "builds": [
+    {
+      "src": "src/index.ts",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "src/index.ts"
+    }
+  ],
+  "env": {
+    "PORT": "3000",
+    "NODE_ENV": "production"
+  }
+}
