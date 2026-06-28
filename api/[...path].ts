@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import { healthRoutes } from './_backend/routes';
 
 const app = express();
 
@@ -9,9 +10,7 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json());
 
-app.get('/test', (req, res) => {
-  res.json({ message: 'Express with middleware works!' });
-});
+app.use('/api', healthRoutes);
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
