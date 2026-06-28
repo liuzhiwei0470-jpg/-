@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import { healthRoutes } from './_backend/routes';
+import { healthRoutes } from './dist/routes';
 
 const app = express();
 
