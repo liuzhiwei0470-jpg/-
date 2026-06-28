@@ -148,6 +148,10 @@
                 <Clock :size="12" />
                 {{ formatRelativeTimeFull(article.published) }}
               </span>
+              <span v-if="article.createdAt" class="article-stored">
+                <Database :size="12" />
+                {{ formatRelativeTimeFull(article.createdAt) }}
+              </span>
             </div>
           </div>
           <div class="article-actions" @click.stop>
@@ -223,6 +227,7 @@ import {
   Tag,
   User,
   Clock,
+  Database,
   Heart,
   CheckCircle,
   ChevronLeft,
@@ -929,6 +934,10 @@ function scrollToActive() {
 .article-source {
   color: var(--color-primary);
   font-weight: 500;
+}
+
+.article-stored {
+  opacity: 0.7;
 }
 
 .article-actions {
